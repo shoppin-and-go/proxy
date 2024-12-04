@@ -10,7 +10,7 @@ const server = require('http').createServer(app);
 // CORS 설정
 app.use(cors({
     origin: 'https://shoppin-and-go.github.io',
-    methods: ['GET', 'POST', 'PUT', PATCH, 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
