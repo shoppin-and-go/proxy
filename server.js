@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const sockjs = require('sockjs');
+const StompServer = require('stomp-broker-js');
 
 const app = express();
 const server = require('http').createServer(app);
@@ -17,14 +18,19 @@ app.use(cors({
 // SockJS 서버 생성
 const sockjsServer = sockjs.createServer({
     prefix: '/ws',
-    response_limit: 128 * 1024,
     log: (severity, message) => {
         console.log(severity, message);
     }
 });
 
-// SockJS 핸들러 설치
-sockjsServer.installHandlers(server);
+// STOMP 서버 생성
+const stompServer = new StompServer({
+    server: sockjsServer,
+    path: '/ws',
+    debug: (msg) => {
+        console.log(msg);
+    }
+});
 
 // HTTP 프록시
 app.use('/', createProxyMiddleware({
@@ -37,33 +43,19 @@ app.use('/', createProxyMiddleware({
     }
 }));
 
-// SockJS 연결 처리
-sockjsServer.on('connection', (conn) => {
-    console.log('Client connected');
+// SockJS 핸들러 설치
+sockjsServer.installHandlers(server);
 
+// STOMP 메시지 처리
+stompServer.subscribe('/queue/device/*', (msg, headers) => {
     const targetWs = new WebSocket(`ws://${process.env.API_URL}/ws`);
 
-    conn.on('data', (message) => {
-        console.log('Client message:', message);
-        if (targetWs.readyState === WebSocket.OPEN) {
-            targetWs.send(message);
-        }
+    targetWs.on('open', () => {
+        targetWs.send(msg);
     });
 
     targetWs.on('message', (message) => {
-        console.log('Server message:', message.toString());
-        if (conn.writable) {
-            conn.write(message.toString());
-        }
-    });
-
-    conn.on('close', () => {
-        console.log('Client disconnected');
-        targetWs.close();
-    });
-
-    targetWs.on('error', (error) => {
-        console.error('Target WebSocket error:', error);
+        stompServer.send('/queue/device/*', {}, message.toString());
     });
 });
 
