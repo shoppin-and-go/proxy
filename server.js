@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const sockjs = require('sockjs');
-const StompServer = require('@stomp/stompjs').Server;
+const Stomp = require('stompjs');
 
 const app = express();
 const server = require('http').createServer(app);
@@ -22,13 +22,6 @@ const sockjsServer = sockjs.createServer({
     websocket: true
 });
 
-// STOMP 서버 설정
-const stompServer = new StompServer({
-    debug: (str) => {
-        console.log(str);
-    }
-});
-
 // HTTP 프록시
 app.use('/', createProxyMiddleware({
     target: `http://${process.env.API_URL}`,
@@ -45,24 +38,32 @@ sockjsServer.on('connection', (conn) => {
     console.log('Client connected');
     const targetWs = new WebSocket(`ws://${process.env.API_URL}/ws`);
 
-    // STOMP 연결 설정
-    stompServer.connectWebSocket(conn);
+    // STOMP 클라이언트 생성
+    const stompClient = Stomp.over(targetWs);
 
-    // 구독 설정
-    stompServer.subscribe('/queue/device/*', (msg, headers) => {
-        if (targetWs.readyState === WebSocket.OPEN) {
-            targetWs.send(msg);
-        }
+    stompClient.connect({}, () => {
+        console.log('Connected to STOMP server');
+
+        // 구독 설정
+        stompClient.subscribe('/queue/device/*', (message) => {
+            if (conn.writable) {
+                conn.write(message.body);
+            }
+        });
     });
 
-    targetWs.on('message', (message) => {
-        console.log('Server message:', message.toString());
-        stompServer.send('/queue/device/*', {}, message.toString());
+    conn.on('data', (message) => {
+        console.log('Client message:', message);
+        if (stompClient.connected) {
+            stompClient.send('/queue/device/*', {}, message);
+        }
     });
 
     conn.on('close', () => {
         console.log('Client disconnected');
-        targetWs.close();
+        if (stompClient.connected) {
+            stompClient.disconnect();
+        }
     });
 
     targetWs.on('error', (error) => {
