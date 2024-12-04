@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const sockjs = require('sockjs');
+const StompServer = require('@stomp/stompjs').Server;
 
 const app = express();
 const server = require('http').createServer(app);
@@ -21,6 +22,13 @@ const sockjsServer = sockjs.createServer({
     websocket: true
 });
 
+// STOMP 서버 설정
+const stompServer = new StompServer({
+    debug: (str) => {
+        console.log(str);
+    }
+});
+
 // HTTP 프록시
 app.use('/', createProxyMiddleware({
     target: `http://${process.env.API_URL}`,
@@ -37,20 +45,19 @@ sockjsServer.on('connection', (conn) => {
     console.log('Client connected');
     const targetWs = new WebSocket(`ws://${process.env.API_URL}/ws`);
 
-    targetWs.on('open', () => {
-        console.log('Connected to target WebSocket');
+    // STOMP 연결 설정
+    stompServer.connectWebSocket(conn);
 
-        conn.on('data', (message) => {
-            console.log('Client message:', message);
-            targetWs.send(message);
-        });
+    // 구독 설정
+    stompServer.subscribe('/queue/device/*', (msg, headers) => {
+        if (targetWs.readyState === WebSocket.OPEN) {
+            targetWs.send(msg);
+        }
+    });
 
-        targetWs.on('message', (message) => {
-            console.log('Server message:', message.toString());
-            if (conn.writable) {
-                conn.write(message.toString());
-            }
-        });
+    targetWs.on('message', (message) => {
+        console.log('Server message:', message.toString());
+        stompServer.send('/queue/device/*', {}, message.toString());
     });
 
     conn.on('close', () => {
@@ -64,7 +71,7 @@ sockjsServer.on('connection', (conn) => {
     });
 });
 
-// SockJS를 서버에 연결
+// SockJS 핸들러 설치
 sockjsServer.installHandlers(server, { prefix: '/ws' });
 
 const port = process.env.PORT || 3000;
