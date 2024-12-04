@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const sockjs = require('sockjs');
+const stompjs = require('@stomp/stompjs');
 
 const app = express();
 const server = require('http').createServer(app);
@@ -17,10 +18,7 @@ app.use(cors({
 // SockJS 서버 생성
 const sockjsServer = sockjs.createServer({
     prefix: '/ws',
-    log: (severity, message) => {
-        console.log(severity, message);
-    },
-    transports: ['websocket', 'xhr-polling', 'eventsource']
+    response_limit: 128 * 1024
 });
 
 // HTTP 프록시
@@ -34,39 +32,50 @@ app.use('/', createProxyMiddleware({
     }
 }));
 
-// SockJS 연결 처리
-sockjsServer.installHandlers(server, { prefix: '/ws' });
-
+// SockJS/STOMP 연결 처리
 sockjsServer.on('connection', (conn) => {
     console.log('Client connected');
 
     const targetWs = new WebSocket(`ws://${process.env.API_URL}/ws`);
+    const stompClient = new stompjs.Client({
+        webSocketFactory: () => targetWs
+    });
 
-    targetWs.on('open', () => {
-        console.log('Connected to target WebSocket');
+    stompClient.onConnect = () => {
+        console.log('Connected to STOMP server');
+    };
 
-        conn.on('data', (message) => {
-            console.log('Client message:', message);
-            if (targetWs.readyState === WebSocket.OPEN) {
-                targetWs.send(message);
-            }
-        });
+    stompClient.onStompError = (frame) => {
+        console.error('STOMP error:', frame);
+    };
 
-        targetWs.on('message', (message) => {
-            console.log('Server message:', message.toString());
+    conn.on('data', (message) => {
+        if (targetWs.readyState === WebSocket.OPEN) {
+            targetWs.send(message);
+        }
+    });
+
+    targetWs.on('message', (message) => {
+        if (conn.writable) {
             conn.write(message.toString());
-        });
+        }
     });
 
     conn.on('close', () => {
         console.log('Client disconnected');
+        stompClient.deactivate();
         targetWs.close();
     });
 
     targetWs.on('error', (error) => {
         console.error('Target WebSocket error:', error);
     });
+
+    stompClient.activate();
 });
+
+// SockJS를 서버에 연결
+sockjsServer.attach(server);
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {

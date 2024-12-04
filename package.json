@@ -23,6 +23,7 @@
     "express": "^4.21.1",
     "http-proxy-middleware": "^3.0.3",
     "ws": "^8.18.0",
-    "sockjs": "^0.3.24"
+    "sockjs": "^0.3.24",
+    "@stomp/stompjs": "^7.0.0"
   }
 }
