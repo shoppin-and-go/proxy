@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const sockjs = require('sockjs');
-const stompjs = require('@stomp/stompjs');
 
 const app = express();
 const server = require('http').createServer(app);
@@ -18,8 +17,14 @@ app.use(cors({
 // SockJS 서버 생성
 const sockjsServer = sockjs.createServer({
     prefix: '/ws',
-    response_limit: 128 * 1024
+    response_limit: 128 * 1024,
+    log: (severity, message) => {
+        console.log(severity, message);
+    }
 });
+
+// SockJS 핸들러 설치
+sockjsServer.installHandlers(server);
 
 // HTTP 프록시
 app.use('/', createProxyMiddleware({
@@ -32,30 +37,21 @@ app.use('/', createProxyMiddleware({
     }
 }));
 
-// SockJS/STOMP 연결 처리
+// SockJS 연결 처리
 sockjsServer.on('connection', (conn) => {
     console.log('Client connected');
 
     const targetWs = new WebSocket(`ws://${process.env.API_URL}/ws`);
-    const stompClient = new stompjs.Client({
-        webSocketFactory: () => targetWs
-    });
-
-    stompClient.onConnect = () => {
-        console.log('Connected to STOMP server');
-    };
-
-    stompClient.onStompError = (frame) => {
-        console.error('STOMP error:', frame);
-    };
 
     conn.on('data', (message) => {
+        console.log('Client message:', message);
         if (targetWs.readyState === WebSocket.OPEN) {
             targetWs.send(message);
         }
     });
 
     targetWs.on('message', (message) => {
+        console.log('Server message:', message.toString());
         if (conn.writable) {
             conn.write(message.toString());
         }
@@ -63,19 +59,13 @@ sockjsServer.on('connection', (conn) => {
 
     conn.on('close', () => {
         console.log('Client disconnected');
-        stompClient.deactivate();
         targetWs.close();
     });
 
     targetWs.on('error', (error) => {
         console.error('Target WebSocket error:', error);
     });
-
-    stompClient.activate();
 });
-
-// SockJS를 서버에 연결
-sockjsServer.attach(server);
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
