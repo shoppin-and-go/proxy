@@ -2,11 +2,10 @@ const WebSocket = require('ws');
 const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
-const sockjs = require('sockjs');
-const StompServer = require('stomp-broker-js');
 
 const app = express();
 const server = require('http').createServer(app);
+const wss = new WebSocket.Server({ server });
 
 // CORS 설정
 app.use(cors({
@@ -14,23 +13,6 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
-// SockJS 서버 생성
-const sockjsServer = sockjs.createServer({
-    prefix: '/ws',
-    log: (severity, message) => {
-        console.log(severity, message);
-    }
-});
-
-// STOMP 서버 생성
-const stompServer = new StompServer({
-    server: sockjsServer,
-    path: '/ws',
-    debug: (msg) => {
-        console.log(msg);
-    }
-});
 
 // HTTP 프록시
 app.use('/', createProxyMiddleware({
@@ -43,19 +25,34 @@ app.use('/', createProxyMiddleware({
     }
 }));
 
-// SockJS 핸들러 설치
-sockjsServer.installHandlers(server);
-
-// STOMP 메시지 처리
-stompServer.subscribe('/queue/device/*', (msg, headers) => {
+// WebSocket 프록시
+wss.on('connection', (ws) => {
+    console.log('Client connected');
     const targetWs = new WebSocket(`ws://${process.env.API_URL}/ws`);
 
+    // 연결이 열리면 메시지 전달 시작
     targetWs.on('open', () => {
-        targetWs.send(msg);
+        console.log('Connected to target WebSocket');
+
+        ws.on('message', (message) => {
+            console.log('Client message:', message.toString());
+            targetWs.send(message);
+        });
+
+        targetWs.on('message', (message) => {
+            console.log('Server message:', message.toString());
+            ws.send(message);
+        });
     });
 
-    targetWs.on('message', (message) => {
-        stompServer.send('/queue/device/*', {}, message.toString());
+    ws.on('close', () => {
+        console.log('Client disconnected');
+        targetWs.close();
+    });
+
+    targetWs.on('error', (error) => {
+        console.error('Target WebSocket error:', error);
+        ws.close();
     });
 });
 
