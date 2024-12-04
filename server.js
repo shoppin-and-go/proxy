@@ -2,10 +2,10 @@ const WebSocket = require('ws');
 const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const sockjs = require('sockjs');
 
 const app = express();
 const server = require('http').createServer(app);
-const wss = new WebSocket.Server({ server });
 
 // CORS 설정
 app.use(cors({
@@ -13,6 +13,13 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// SockJS 서버 설정
+const sockjsServer = sockjs.createServer({
+    prefix: '/ws',
+    response_limit: 128 * 1024,
+    websocket: true
+});
 
 // HTTP 프록시
 app.use('/', createProxyMiddleware({
@@ -25,36 +32,40 @@ app.use('/', createProxyMiddleware({
     }
 }));
 
-// WebSocket 프록시
-wss.on('connection', (ws) => {
+// SockJS 연결 처리
+sockjsServer.on('connection', (conn) => {
     console.log('Client connected');
     const targetWs = new WebSocket(`ws://${process.env.API_URL}/ws`);
 
-    // 연결이 열리면 메시지 전달 시작
     targetWs.on('open', () => {
         console.log('Connected to target WebSocket');
 
-        ws.on('message', (message) => {
-            console.log('Client message:', message.toString());
+        conn.on('data', (message) => {
+            console.log('Client message:', message);
             targetWs.send(message);
         });
 
         targetWs.on('message', (message) => {
             console.log('Server message:', message.toString());
-            ws.send(message);
+            if (conn.writable) {
+                conn.write(message.toString());
+            }
         });
     });
 
-    ws.on('close', () => {
+    conn.on('close', () => {
         console.log('Client disconnected');
         targetWs.close();
     });
 
     targetWs.on('error', (error) => {
         console.error('Target WebSocket error:', error);
-        ws.close();
+        conn.close();
     });
 });
+
+// SockJS를 서버에 연결
+sockjsServer.attach(server);
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
