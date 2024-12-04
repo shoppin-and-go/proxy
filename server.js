@@ -16,15 +16,24 @@ app.use(cors({
 const proxy = createProxyMiddleware({
     target: `http://${process.env.API_URL}`,
     changeOrigin: true,
-    ws: true,
+    ws: true,  // WebSocket 지원
     pathRewrite: {
-        '^/ws': '/ws'
+        '^/ws': '/ws'  // WebSocket 경로 유지
     },
     onProxyReq: (proxyReq, req, res) => {
-        // PATCH 요청 처리를 위한 헤더 설정
-        if (req.method === 'PATCH') {
-            proxyReq.setHeader('Content-Type', 'application/json');
-        }
+        // 요청 로깅
+        console.log('Proxying request:', {
+            method: req.method,
+            url: req.url,
+            headers: req.headers
+        });
+    },
+    onProxyRes: (proxyRes, req, res) => {
+        // 응답 로깅
+        console.log('Received response:', {
+            statusCode: proxyRes.statusCode,
+            headers: proxyRes.headers
+        });
     },
     onError: (err, req, res) => {
         console.error('Proxy error:', err);
@@ -38,4 +47,4 @@ app.use('/', proxy);
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
     console.log(`Server running on port ${port}`);
-});
+}); 
