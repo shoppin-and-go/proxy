@@ -10,7 +10,7 @@ const server = require('http').createServer(app);
 // CORS 설정
 app.use(cors({
     origin: 'https://shoppin-and-go.github.io',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -19,10 +19,24 @@ const sockjsServer = sockjs.createServer({
     prefix: '/ws',
     log: (severity, message) => {
         console.log(severity, message);
-    }
+    },
+    transports: ['websocket', 'xhr-polling', 'eventsource']
 });
 
+// HTTP 프록시
+app.use('/', createProxyMiddleware({
+    target: `http://${process.env.API_URL}`,
+    changeOrigin: true,
+    ws: true,
+    onError: (err, req, res) => {
+        console.error('Proxy error:', err);
+        res.status(502).json({ error: 'Proxy error', details: err.message });
+    }
+}));
+
 // SockJS 연결 처리
+sockjsServer.installHandlers(server, { prefix: '/ws' });
+
 sockjsServer.on('connection', (conn) => {
     console.log('Client connected');
 
@@ -53,20 +67,6 @@ sockjsServer.on('connection', (conn) => {
         console.error('Target WebSocket error:', error);
     });
 });
-
-// HTTP 프록시
-app.use('/', createProxyMiddleware({
-    target: `http://${process.env.API_URL}`,
-    changeOrigin: true,
-    ws: true,
-    onError: (err, req, res) => {
-        console.error('Proxy error:', err);
-        res.status(502).json({ error: 'Proxy error', details: err.message });
-    }
-}));
-
-// SockJS를 서버에 연결
-sockjsServer.attach(server);
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
