@@ -16,9 +16,19 @@ app.use(cors({
 const proxy = createProxyMiddleware({
     target: `http://${process.env.API_URL}`,
     changeOrigin: true,
-    ws: true,  // WebSocket 지원
+    ws: true,
     pathRewrite: {
-        '^/ws': '/ws'  // WebSocket 경로 유지
+        '^/ws': '/ws'
+    },
+    onProxyReq: (proxyReq, req, res) => {
+        // PATCH 요청 처리를 위한 헤더 설정
+        if (req.method === 'PATCH') {
+            proxyReq.setHeader('Content-Type', 'application/json');
+        }
+    },
+    onError: (err, req, res) => {
+        console.error('Proxy error:', err);
+        res.status(502).json({ error: 'Proxy error', details: err.message });
     }
 });
 
