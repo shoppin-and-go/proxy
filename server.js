@@ -65,7 +65,7 @@ sockjsServer.on('connection', (conn) => {
 });
 
 // SockJS를 서버에 연결
-sockjsServer.attach(server);
+sockjsServer.installHandlers(server, { prefix: '/ws' });
 
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
