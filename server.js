@@ -21,9 +21,12 @@ const proxy = createProxyMiddleware({
     target: targetUrl,
     changeOrigin: true,
     ws: true,
-    headers: {
-        'User-Agent': 'Dart/3.5 (dart:io)',
-        'Connection': 'keep-alive'
+    onProxyReq: (proxyReq, req, res) => {
+        // PATCH 요청에만 User-Agent 변경
+        if (req.method === 'PATCH') {
+            proxyReq.setHeader('User-Agent', 'Dart/3.5 (dart:io)');
+            proxyReq.setHeader('Connection', 'keep-alive');
+        }
     },
     onProxyRes: (proxyRes, req, res) => {
         proxyRes.headers['Access-Control-Allow-Origin'] = 'https://shoppin-and-go.github.io';
