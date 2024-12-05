@@ -1,93 +1,71 @@
 const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const WebSocket = require('ws');
+const SockJS = require('sockjs');
 
 const app = express();
-const server = require('http').createServer(app);
-
-// body-parser 미들웨어 추가
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const port = process.env.PORT || 3000;
+const targetUrl = 'http://ec2-3-38-128-6.ap-northeast-2.compute.amazonaws.com';
 
 // CORS 설정
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
-    credentials: true,
-    maxAge: 86400
+app.use(cors());
+
+// HTTP 프록시 설정
+app.use('/', createProxyMiddleware({
+    target: targetUrl,
+    changeOrigin: true,
+    ws: true, // 웹소켓 지원 활성화
+    pathRewrite: {
+        '^/': '/' // URL 경로 재작성 규칙
+    },
+    onError: (err, req, res) => {
+        console.error('Proxy Error:', err);
+        res.status(500).json({ error: 'Proxy Error' });
+    }
 }));
 
-// OPTIONS 요청에 대한 직접적인 처리 추가
-app.options('*', (req, res) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.status(200).send();
-});
-
-// 프록시 설정
-const proxy = createProxyMiddleware({
-    target: `http://${process.env.API_URL}`,
-    changeOrigin: true,
-    ws: true,
-    pathRewrite: {
-        '^/ws': '/ws'
-    },
-    onProxyReq: (proxyReq, req, res) => {
-        // PATCH 요청 처리 개선
-        if (req.method === 'PATCH' && req.body) {
-            let bodyData = JSON.stringify(req.body);
-            // 모든 헤더 로깅
-            console.log('Original headers:', req.headers);
-            console.log('Request body:', bodyData);
-
-            // 기존 헤더 제거
-            proxyReq.removeHeader('content-length');
-            proxyReq.removeHeader('content-type');
-
-            // 새 헤더 설정
-            proxyReq.setHeader('Content-Type', 'application/json');
-            proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-
-            // body 쓰기
-            proxyReq.write(bodyData);
-
-            // 최종 헤더 로깅
-            console.log('Final headers:', proxyReq.getHeaders());
-        }
-    },
-    onProxyRes: (proxyRes, req, res) => {
-        // CORS 헤더 설정 - origin을 * 로 변경
-        proxyRes.headers['Access-Control-Allow-Origin'] = '*';
-        proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
-        proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, Accept, Authorization';
-        proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
-
-        // 모든 응답 로깅 (디버깅용)
-        console.log('Response:', {
-            statusCode: proxyRes.statusCode,
-            headers: proxyRes.headers,
-            method: req.method,
-            url: req.url,
-            body: req.body
-        });
-
-        // 응답 body 로깅 (디버깅용)
-        let body = '';
-        proxyRes.on('data', function (chunk) {
-            body += chunk;
-        });
-        proxyRes.on('end', function () {
-            console.log('Response body:', body);
-        });
+// 웹소켓 서버 설정
+const sockjs = SockJS.createServer({
+    prefix: '/ws',
+    log: (severity, message) => {
+        console.log('[SockJS]', severity, message);
     }
 });
 
-app.use('/', proxy);
+// SockJS 이벤트 핸들러
+sockjs.on('connection', (conn) => {
+    console.log('Client connected');
 
-const port = process.env.PORT || 3000;
-server.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-}); 
+    // 웹소켓 프록시 연결
+    const ws = new WebSocket(`${targetUrl.replace('http', 'ws')}/ws`);
+
+    ws.on('open', () => {
+        console.log('Connected to target WebSocket server');
+    });
+
+    ws.on('message', (data) => {
+        conn.write(data);
+    });
+
+    conn.on('data', (message) => {
+        ws.send(message);
+    });
+
+    conn.on('close', () => {
+        console.log('Client disconnected');
+        ws.close();
+    });
+
+    ws.on('error', (error) => {
+        console.error('WebSocket Error:', error);
+        conn.close();
+    });
+});
+
+const server = app.listen(port, () => {
+    console.log(`Proxy server is running on port ${port}`);
+});
+
+// SockJS를 HTTP 서버에 연결
+sockjs.attach(server);

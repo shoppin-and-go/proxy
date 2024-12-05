@@ -1,29 +1,23 @@
 {
-  "name": "proxy",
+  "name": "shopping-cart-proxy",
   "version": "1.0.0",
-  "description": "",
+  "description": "Proxy server for Shopping Cart application",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon server.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/shoppin-and-go/proxy.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/shoppin-and-go/proxy/issues"
-  },
-  "homepage": "https://github.com/shoppin-and-go/proxy#readme",
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.21.1",
-    "http-proxy-middleware": "^3.0.3",
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^2.0.6",
     "sockjs": "^0.3.24",
-    "stompjs": "^2.3.3",
-    "ws": "^8.18.0"
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
