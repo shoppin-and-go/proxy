@@ -11,16 +11,21 @@ app.use(express.urlencoded({ extended: true }));
 
 // CORS 설정
 app.use(cors({
-    origin: 'https://shoppin-and-go.github.io',
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
     credentials: true,
     maxAge: 86400
 }));
 
-// OPTIONS 요청 처리 추가
-app.options('*', cors());
+// OPTIONS 요청에 대한 직접적인 처리 추가
+app.options('*', (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.status(200).send();
+});
 
 // 프록시 설정
 const proxy = createProxyMiddleware({
@@ -54,10 +59,10 @@ const proxy = createProxyMiddleware({
         }
     },
     onProxyRes: (proxyRes, req, res) => {
-        // CORS 헤더 설정
-        proxyRes.headers['Access-Control-Allow-Origin'] = 'https://shoppin-and-go.github.io';
+        // CORS 헤더 설정 - origin을 * 로 변경
+        proxyRes.headers['Access-Control-Allow-Origin'] = '*';
         proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
-        proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
+        proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, Accept, Authorization';
         proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
 
         // 모든 응답 로깅 (디버깅용)
