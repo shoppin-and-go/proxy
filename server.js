@@ -1,38 +1,27 @@
 const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
-const SockJS = require('sockjs');
 
 const app = express();
 const port = process.env.PORT || 3000;
 const targetUrl = 'http://ec2-3-38-128-6.ap-northeast-2.compute.amazonaws.com';
 
-// CORS 설정
-app.use(cors());
-
-// WebSocket 프록시 설정
-const wsProxy = createProxyMiddleware('/ws', {
-    target: targetUrl.replace('http', 'ws'),
-    ws: true,
-    changeOrigin: true
-});
-
-// HTTP 프록시 설정
-const httpProxy = createProxyMiddleware({
+// 모든 요청을 EC2 서버로 프록시
+const proxy = createProxyMiddleware({
     target: targetUrl,
     changeOrigin: true,
-    ws: true,
+    ws: true, // 웹소켓 활성화
     onError: (err, req, res) => {
         console.error('Proxy Error:', err);
         res.status(500).json({ error: 'Proxy Error' });
     }
 });
 
-app.use('/ws', wsProxy);
-app.use('/', httpProxy);
+app.use('/', proxy);
 
 const server = app.listen(port, () => {
     console.log(`Proxy server is running on port ${port}`);
 });
 
-server.on('upgrade', wsProxy.upgrade); 
+// 웹소켓 업그레이드 요청 처리
+server.on('upgrade', proxy.upgrade); 
