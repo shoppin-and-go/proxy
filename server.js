@@ -22,14 +22,21 @@ const proxy = createProxyMiddleware({
     changeOrigin: true,
     ws: true,
     onProxyReq: (proxyReq, req, res) => {
-        // 모든 요청의 헤더와 메서드를 로깅
+        // 모라우저 관련 헤더 제거
+        proxyReq.removeHeader('sec-fetch-dest');
+        proxyReq.removeHeader('sec-fetch-mode');
+        proxyReq.removeHeader('sec-fetch-site');
+        proxyReq.removeHeader('sec-ch-ua');
+        proxyReq.removeHeader('sec-ch-ua-mobile');
+        proxyReq.removeHeader('sec-ch-ua-platform');
+
+        // 로깅 유지
         console.log('=== 요청 정보 ===');
         console.log('Method:', req.method);
         console.log('Headers:', req.headers);
         console.log('URL:', req.url);
     },
     onProxyRes: (proxyRes, req, res) => {
-        // CORS 헤더 추가
         proxyRes.headers['Access-Control-Allow-Origin'] = 'https://shoppin-and-go.github.io';
         proxyRes.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS';
         proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization';
