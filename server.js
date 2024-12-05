@@ -33,39 +33,50 @@ const proxy = createProxyMiddleware({
     onProxyReq: (proxyReq, req, res) => {
         // PATCH 요청 처리 개선
         if (req.method === 'PATCH' && req.body) {
-            const bodyData = JSON.stringify(req.body);
-            // 기존 content-length 헤더 제거
-            proxyReq.removeHeader('Content-Length');
+            let bodyData = JSON.stringify(req.body);
+            // 모든 헤더 로깅
+            console.log('Original headers:', req.headers);
+            console.log('Request body:', bodyData);
+
+            // 기존 헤더 제거
+            proxyReq.removeHeader('content-length');
+            proxyReq.removeHeader('content-type');
+
+            // 새 헤더 설정
             proxyReq.setHeader('Content-Type', 'application/json');
             proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-            proxyReq.write(bodyData);
-        }
 
-        console.log('Proxying request:', {
-            method: req.method,
-            url: req.url,
-            body: req.body,  // body 로깅 추가
-            headers: proxyReq.getHeaders()  // 실제 전송되는 헤더 로깅
-        });
+            // body 쓰기
+            proxyReq.write(bodyData);
+
+            // 최종 헤더 로깅
+            console.log('Final headers:', proxyReq.getHeaders());
+        }
     },
     onProxyRes: (proxyRes, req, res) => {
-        // CORS 헤더 업데이트
+        // CORS 헤더 설정
         proxyRes.headers['Access-Control-Allow-Origin'] = 'https://shoppin-and-go.github.io';
         proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
         proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
         proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
-        proxyRes.headers['Access-Control-Expose-Headers'] = 'Content-Type, Authorization';  // 추가
 
-        // 에러 발생 시 더 자세한 로깅
-        if (proxyRes.statusCode >= 400) {
-            console.error('Error response:', {
-                statusCode: proxyRes.statusCode,
-                headers: proxyRes.headers,
-                method: req.method,
-                url: req.url,
-                body: req.body
-            });
-        }
+        // 모든 응답 로깅 (디버깅용)
+        console.log('Response:', {
+            statusCode: proxyRes.statusCode,
+            headers: proxyRes.headers,
+            method: req.method,
+            url: req.url,
+            body: req.body
+        });
+
+        // 응답 body 로깅 (디버깅용)
+        let body = '';
+        proxyRes.on('data', function (chunk) {
+            body += chunk;
+        });
+        proxyRes.on('end', function () {
+            console.log('Response body:', body);
+        });
     }
 });
 
