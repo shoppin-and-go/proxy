@@ -22,12 +22,11 @@ const proxy = createProxyMiddleware({
     target: targetUrl,
     changeOrigin: true,
     ws: true, // 웹소켓 활성화
-    onProxyRes: (proxyRes, req, res) => {
-        // CORS 헤더 추가
-        proxyRes.headers['Access-Control-Allow-Origin'] = 'https://shoppin-and-go.github.io';
-        proxyRes.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS';
-        proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization';
-        proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
+    onProxyReq: (proxyReq, req, res) => {
+        // User-Agent 헤더를 Dart/3.5로 변경
+        proxyReq.setHeader('User-Agent', 'Dart/3.5 (dart:io)');
+        // HTTP 버전 강제 설정 (필요한 경우)
+        proxyReq.setHeader('Connection', 'keep-alive');
     },
     onError: (err, req, res) => {
         console.error('Proxy Error:', err);
