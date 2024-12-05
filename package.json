@@ -4,8 +4,7 @@
   "description": "Proxy server for Shopping Cart application",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -13,9 +12,6 @@
     "http-proxy-middleware": "^2.0.6",
     "sockjs": "^0.3.24",
     "ws": "^8.16.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.3"
   },
   "engines": {
     "node": ">=18.0.0"
