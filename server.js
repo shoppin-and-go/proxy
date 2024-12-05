@@ -5,10 +5,6 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const app = express();
 const server = require('http').createServer(app);
 
-// body-parser 설정 추가
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
 // CORS 설정
 app.use(cors({
     origin: 'https://shoppin-and-go.github.io',
@@ -27,9 +23,10 @@ const proxy = createProxyMiddleware({
         '^/ws': '/ws'
     },
     onProxyReq: (proxyReq, req, res) => {
-        // body가 있는 요청(PATCH 등)을 위한 처리
-        if (req.body && req.method !== 'GET') {
+        // PATCH 요청일 때만 body 처리
+        if (req.method === 'PATCH' && req.body) {
             const bodyData = JSON.stringify(req.body);
+            proxyReq.setHeader('Content-Type', 'application/json');
             proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
             proxyReq.write(bodyData);
         }
@@ -38,8 +35,7 @@ const proxy = createProxyMiddleware({
         console.log('Proxying request:', {
             method: req.method,
             url: req.url,
-            headers: req.headers,
-            body: req.body
+            headers: req.headers
         });
     },
     onProxyRes: (proxyRes, req, res) => {
