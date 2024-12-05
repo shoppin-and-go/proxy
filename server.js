@@ -22,13 +22,12 @@ const proxy = createProxyMiddleware({
     changeOrigin: true,
     ws: true,
     onProxyReq: (proxyReq, req, res) => {
-        // 모라우저 관련 헤더 제거
-        proxyReq.removeHeader('sec-fetch-dest');
-        proxyReq.removeHeader('sec-fetch-mode');
-        proxyReq.removeHeader('sec-fetch-site');
-        proxyReq.removeHeader('sec-ch-ua');
-        proxyReq.removeHeader('sec-ch-ua-mobile');
-        proxyReq.removeHeader('sec-ch-ua-platform');
+        if (req.method === 'PATCH') {
+            // content-type 헤더 강제 설정
+            proxyReq.setHeader('Content-Type', 'application/json;charset=UTF-8');
+            proxyReq.setHeader('User-Agent', 'Dart/3.5 (dart:io)');
+            proxyReq.setHeader('Accept-Encoding', 'gzip');
+        }
 
         // 로깅 유지
         console.log('=== 요청 정보 ===');
