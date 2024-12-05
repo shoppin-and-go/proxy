@@ -23,7 +23,21 @@ const proxy = createProxyMiddleware({
     ws: true,
     onProxyReq: (proxyReq, req, res) => {
         if (req.method === 'PATCH') {
-            // content-type 헤더 강제 설정
+            // 기존 헤더 제거
+            proxyReq.removeHeader('user-agent');
+            proxyReq.removeHeader('accept-encoding');
+            proxyReq.removeHeader('accept');
+            proxyReq.removeHeader('accept-language');
+            proxyReq.removeHeader('origin');
+            proxyReq.removeHeader('referer');
+            proxyReq.removeHeader('sec-ch-ua');
+            proxyReq.removeHeader('sec-ch-ua-mobile');
+            proxyReq.removeHeader('sec-ch-ua-platform');
+            proxyReq.removeHeader('sec-fetch-dest');
+            proxyReq.removeHeader('sec-fetch-mode');
+            proxyReq.removeHeader('sec-fetch-site');
+
+            // 새 헤더 설정
             proxyReq.setHeader('Content-Type', 'application/json;charset=UTF-8');
             proxyReq.setHeader('User-Agent', 'Dart/3.5 (dart:io)');
             proxyReq.setHeader('Accept-Encoding', 'gzip');
@@ -32,7 +46,7 @@ const proxy = createProxyMiddleware({
         // 로깅 유지
         console.log('=== 요청 정보 ===');
         console.log('Method:', req.method);
-        console.log('Headers:', req.headers);
+        console.log('Headers:', proxyReq.getHeaders());
         console.log('URL:', req.url);
     },
     onProxyRes: (proxyRes, req, res) => {
