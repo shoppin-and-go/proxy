@@ -28,6 +28,13 @@ const proxy = createProxyMiddleware({
         // HTTP 버전 강제 설정 (필요한 경우)
         proxyReq.setHeader('Connection', 'keep-alive');
     },
+    onProxyRes: (proxyRes, req, res) => {
+        // CORS 헤더 추가
+        proxyRes.headers['Access-Control-Allow-Origin'] = 'https://shoppin-and-go.github.io';
+        proxyRes.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS';
+        proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization';
+        proxyRes.headers['Access-Control-Allow-Credentials'] = 'true';
+    },
     onError: (err, req, res) => {
         console.error('Proxy Error:', err);
         res.status(500).json({ error: 'Proxy Error' });
